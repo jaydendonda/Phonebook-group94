@@ -1,0 +1,315 @@
+  package phonebook;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.util.ArrayList;
+import java.util.Collections;
+
+public class Phonebook implements ActionListener {
+
+    JFrame frame;
+    JTextField nameField, phoneField, searchField;
+    JTable contactTable;
+    DefaultTableModel contactTableModel;
+    JButton addButton, viewButton, searchButton, deleteButton, updateButton, resetButton;
+
+    public Phonebook() {
+        // Frame setup
+        frame = new JFrame("Modern Phonebook");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(700, 500);
+        frame.setLayout(new BorderLayout(10, 10));
+        
+        // Panel setup for the form input fields
+        JPanel inputPanel = new JPanel();
+        inputPanel.setLayout(new GridLayout(3, 2, 10, 10));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Name, Phone, and Search Field
+        nameField = new JTextField();
+        phoneField = new JTextField();
+        searchField = new JTextField();
+
+        // Label and input field for Name
+        inputPanel.add(new JLabel("Name:"));
+        inputPanel.add(nameField);
+        inputPanel.add(new JLabel("Phone:"));
+        inputPanel.add(phoneField);
+        inputPanel.add(new JLabel("Search:"));
+        inputPanel.add(searchField);
+
+        // Button Panel
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new GridLayout(1, 6, 10, 10));
+
+        // Buttons
+        addButton = new JButton("Add");
+        viewButton = new JButton("View All");
+        searchButton = new JButton("Search");
+        deleteButton = new JButton("Delete");
+        updateButton = new JButton("Update");
+        resetButton = new JButton("Reset");
+
+        // Add action listeners to buttons
+        addButton.addActionListener(this);
+        viewButton.addActionListener(this);
+        searchButton.addActionListener(this);
+        deleteButton.addActionListener(this);
+        updateButton.addActionListener(this);
+        resetButton.addActionListener(this);
+
+        // Adding buttons to the panel
+        buttonPanel.add(addButton);
+        buttonPanel.add(viewButton);
+        buttonPanel.add(searchButton);
+        buttonPanel.add(deleteButton);
+        buttonPanel.add(updateButton);
+        buttonPanel.add(resetButton);
+
+        // Contact Table setup
+        String[] columnNames = {"Name", "Phone"};
+        contactTableModel = new DefaultTableModel(columnNames, 0);
+        contactTable = new JTable(contactTableModel);
+        JScrollPane tableScrollPane = new JScrollPane(contactTable);
+        
+        // Add components to the frame
+        frame.add(inputPanel, BorderLayout.NORTH);
+        frame.add(buttonPanel, BorderLayout.CENTER);
+        frame.add(tableScrollPane, BorderLayout.SOUTH);
+
+        frame.setVisible(true);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == addButton) {
+            String name = nameField.getText().trim();
+            String phone = phoneField.getText().trim();
+            if (isValidName(name) && isValidPhone(phone)) {
+                if (!isDuplicateContact(name, phone, "", "")) {
+                    contactTableModel.addRow(new Object[]{name, phone});
+                    sortContacts();
+                    nameField.setText("");
+                    phoneField.setText("");
+                    JOptionPane.showMessageDialog(frame, "Contact successfully added.");
+                } else {
+                    JOptionPane.showMessageDialog(frame, "This contact already exists.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(frame, "Invalid input. Name must contain only letters, and phone must contain only digits.");
+            }
+        } else if (e.getSource() == viewButton) {
+            if (contactTableModel.getRowCount() == 0) {
+                JOptionPane.showMessageDialog(frame, "No contacts to display.");
+            }
+        } else if (e.getSource() == searchButton) {
+            String search = searchField.getText().trim();
+            if (!search.isEmpty()) {
+                searchContact(search);
+            } else {
+                JOptionPane.showMessageDialog(frame, "Please enter a name or phone number to search.");
+            }
+        } else if (e.getSource() == deleteButton) {
+            int selectedRow = contactTable.getSelectedRow();
+            if (selectedRow != -1) {
+                int response = JOptionPane.showConfirmDialog(frame,
+                        "Are you sure you want to delete this contact?", "Confirm Delete",
+                        JOptionPane.YES_NO_OPTION);
+                if (response == JOptionPane.YES_OPTION) {
+                    contactTableModel.removeRow(selectedRow);
+                    JOptionPane.showMessageDialog(frame, "Contact deleted successfully.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(frame, "Please select a contact to delete.");
+            }
+        } else if (e.getSource() == updateButton) {
+            int selectedRow = contactTable.getSelectedRow();
+            if (selectedRow != -1) {
+                String currentName = (String) contactTableModel.getValueAt(selectedRow, 0);
+                String currentPhone = (String) contactTableModel.getValueAt(selectedRow, 1);
+
+                String newName = JOptionPane.showInputDialog(frame, "Edit Name:", currentName);
+                String newPhone = JOptionPane.showInputDialog(frame, "Edit Phone:", currentPhone);
+
+                if (newName != null && newPhone != null && !newName.isEmpty() && !newPhone.isEmpty()) {
+                    if (isValidName(newName) && isValidPhone(newPhone)) {
+                        if (!isDuplicateContact(newName, newPhone, currentName, currentPhone)) {
+                            contactTableModel.setValueAt(newName, selectedRow, 0);
+                            contactTableModel.setValueAt(newPhone, selectedRow, 1);
+                            JOptionPane.showMessageDialog(frame, "Contact updated successfully.");
+                        } else {
+                            JOptionPane.showMessageDialog(frame, "This contact already exists.");
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(frame, "Invalid input. Name must contain only letters, and phone must contain only digits.");
+                    }
+                }
+            } else {
+                JOptionPane.showMessageDialog(frame, "Please select a contact to update.");
+            }
+        } else if (e.getSource() == resetButton) {
+            resetTable();
+        }
+    }
+
+    private boolean isValidName(String name) {
+        return name.matches("[a-zA-Z ]+");
+    }
+
+    private boolean isValidPhone(String phone) {
+        return phone.matches("\\d+");
+    }
+
+    private boolean isDuplicateContact(String name, String phone, String currentName, String currentPhone) {
+        for (int i = 0; i < contactTableModel.getRowCount(); i++) {
+            String existingName = (String) contactTableModel.getValueAt(i, 0);
+            String existingPhone = (String) contactTableModel.getValueAt(i, 1);
+            
+            // Skip the current row
+            if (existingName.equalsIgnoreCase(currentName) && existingPhone.equals(currentPhone)) {
+                continue;
+            }
+            if (existingName.equalsIgnoreCase(name) || existingPhone.equals(phone)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void sortContacts() {
+        ArrayList<String[]> contactList = new ArrayList<>();
+        for (int i = 0; i < contactTableModel.getRowCount(); i++) {
+            String name = (String) contactTableModel.getValueAt(i, 0);
+            String phone = (String) contactTableModel.getValueAt(i, 1);
+            contactList.add(new String[]{name, phone});
+        }
+        Collections.sort(contactList, (a, b) -> a[0].compareToIgnoreCase(b[0]));
+        contactTableModel.setRowCount(0);
+        for (String[] contact : contactList) {
+            contactTableModel.addRow(contact);
+        }
+    }
+
+    private void searchContact(String search) {
+        DefaultTableModel searchModel = new DefaultTableModel(new String[]{"Name", "Phone"}, 0);
+        boolean found = false;
+        for (int i = 0; i < contactTableModel.getRowCount(); i++) {
+            String name = (String) contactTableModel.getValueAt(i, 0);
+            String phone = (String) contactTableModel.getValueAt(i, 1);
+            if (name.toLowerCase().contains(search.toLowerCase()) || phone.contains(search)) {
+                searchModel.addRow(new Object[]{name, phone});
+                found = true;
+            }
+        }
+        if (found) {
+            contactTable.setModel(searchModel);
+        } else {
+            JOptionPane.showMessageDialog(frame, "No matching contacts found.");
+        }
+    }
+
+    private void resetTable() {
+        contactTable.setModel(contactTableModel);
+        searchField.setText(""); // Clear search field
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(Phonebook::new);
+    }
+}
+
+
+
+
+
+
+Start Program
+
+Initialize:
+    - contactTable as an empty list to store contacts
+    - Display GUI with input fields, buttons (Add, View, Search, Delete, Update, Reset), and contact table
+
+Function addContact(name, phone):
+    if isValidName(name) and isValidPhone(phone):
+        if not isDuplicateContact(name, phone, "", ""):
+            addRowToTable(name, phone)
+            sortContacts()
+            clearInputFields()
+            showMessage("Contact successfully added")
+        else:
+            showMessage("Contact already exists")
+    else:
+        showMessage("Invalid input: Name must only contain letters and Phone must only contain digits.")
+
+Function searchContact(searchTerm):
+    found = False
+    Initialize searchResults as an empty list
+    for each contact in contactTable:
+        if searchTerm matches contact.name or contact.phone:
+            add contact to searchResults
+            found = True
+    if found:
+        displaySearchResults(searchResults)
+    else:
+        showMessage("No matching contacts found.")
+
+Function deleteContact(selectedContact):
+    if contactIsSelected():
+        if confirmDeletion():
+            removeContactFromTable(selectedContact)
+            showMessage("Contact deleted successfully.")
+    else:
+        showMessage("Please select a contact to delete.")
+
+Function updateContact(selectedContact, newName, newPhone):
+    if contactIsSelected():
+        if isValidName(newName) and isValidPhone(newPhone):
+            if not isDuplicateContact(newName, newPhone, selectedContact.name, selectedContact.phone):
+                updateContactInTable(selectedContact, newName, newPhone)
+                showMessage("Contact updated successfully.")
+            else:
+                showMessage("This contact already exists.")
+        else:
+            showMessage("Invalid input: Name must only contain letters and Phone must only contain digits.")
+    else:
+        showMessage("Please select a contact to update.")
+
+Function sortContacts():
+    contactList = getAllContactsFromTable()
+    sort contactList by name (case-insensitive)
+    clearTable()
+    for each contact in sortedContactList:
+        addContactToTable(contact)
+
+Function isDuplicateContact(name, phone, currentName, currentPhone):
+    for each contact in contactTable:
+        if contact.name == currentName and contact.phone == currentPhone:
+            continue  // Skip current contact
+        if contact.name == name or contact.phone == phone:
+            return True  // Duplicate found
+    return False
+
+Function isValidName(name):
+    return name contains only letters
+
+Function isValidPhone(phone):
+    return phone contains only digits
+
+Function resetTable():
+    displayAllContacts()
+
+Event Listeners for Buttons:
+    - Add Button: Calls addContact(name, phone)
+    - Search Button: Calls searchContact(searchTerm)
+    - Delete Button: Calls deleteContact(selectedContact)
+    - Update Button: Calls updateContact(selectedContact, newName, newPhone)
+    - Reset Button: Calls resetTable()
+    - View Button: Calls resetTable() to display all contacts
+
+Function main():
+    Initialize GUI and set up event listeners
+    Show GUI
+
+End Program
